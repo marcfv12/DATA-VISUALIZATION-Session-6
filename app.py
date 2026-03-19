@@ -67,8 +67,6 @@ palette = st.selectbox(
 
 show_data = st.checkbox("Show filtered data preview", value=True)
 
-chart_height = st.slider("Choose chart height", min_value=4, max_value=8, value=5)
-
 # -----------------------------
 # Default question logic
 # -----------------------------
@@ -95,20 +93,24 @@ if default_mode:
         st.write("Filtered data used for the analysis:")
         st.dataframe(filtered_df.head())
 
+    # Summary for charts
+    summary_df = (
+        filtered_df.groupby("region", as_index=False)["pct"]
+        .sum()
+        .sort_values("pct", ascending=False)
+    )
+
+    correct_region = summary_df.iloc[0]["region"]
+
     if st.button("Show me a random chart"):
         st.session_state.chart_type = random.choice(["A", "B"])
         st.session_state.start_time = time.time()
 
     if st.session_state.chart_type is not None:
-        fig, ax = plt.subplots(figsize=(10, chart_height))
+        fig, ax = plt.subplots(figsize=(10, 5))
 
+        # Chart A: vertical barplot
         if st.session_state.chart_type == "A":
-            summary_df = (
-                filtered_df.groupby("region", as_index=False)["pct"]
-                .sum()
-                .sort_values("pct", ascending=False)
-            )
-
             sns.barplot(
                 data=summary_df,
                 x="region",
@@ -118,71 +120,73 @@ if default_mode:
                 ax=ax,
                 legend=False
             )
-            ax.set_title("Chart A: Total concentration of high-income households by region")
+            ax.set_title("Chart A: High-income concentration by region")
             ax.set_xlabel("Region")
             ax.set_ylabel("Total percentage")
 
+        # ✅ Chart B: pointplot (ONLY CHANGE)
         else:
-            sns.boxplot(
-                data=filtered_df,
+            sns.pointplot(
+                data=summary_df,
                 x="region",
                 y="pct",
-                hue="region",
-                palette=palette,
-                ax=ax,
-                legend=False
+                color="black",
+                ax=ax
             )
-            ax.set_title("Chart B: Distribution of high-income household concentration by region")
+            ax.set_title("Chart B: High-income concentration by region (dot plot)")
             ax.set_xlabel("Region")
-            ax.set_ylabel("Percentage")
+            ax.set_ylabel("Total percentage")
 
         st.pyplot(fig)
 
-        answer = st.radio(
-            "Did this chart answer the question?",
-            ["Select one", "Yes", "No"],
-            index=0
+        st.subheader("A/B Test Question")
+        user_answer = st.radio(
+            "Which region has the highest concentration of high-income households?",
+            options=summary_df["region"].tolist()
         )
 
         confidence = st.slider(
-            "How confident are you in your interpretation?",
+            "How confident are you in your answer?",
             min_value=1,
             max_value=5,
             value=3
         )
 
-        if st.button("Submit feedback"):
-            if answer != "Select one":
-                elapsed_time = time.time() - st.session_state.start_time
+        if st.button("Submit answer"):
+            elapsed_time = time.time() - st.session_state.start_time
+            is_correct = user_answer == correct_region
 
-                st.session_state.responses.append({
-                    "chart": st.session_state.chart_type,
-                    "answered_yes": answer,
-                    "response_time_sec": round(elapsed_time, 2),
-                    "confidence": confidence
-                })
+            st.session_state.responses.append({
+                "chart": st.session_state.chart_type,
+                "selected_region": user_answer,
+                "correct_region": correct_region,
+                "is_correct": is_correct,
+                "response_time_sec": round(elapsed_time, 2),
+                "confidence": confidence
+            })
 
-                st.success("Response recorded. This helps compare which chart communicates better.")
+            if is_correct:
+                st.success("Correct answer!")
             else:
-                st.warning("Please select Yes or No before submitting feedback.")
+                st.error(f"Incorrect. The correct answer is: {correct_region}")
 
     # -----------------------------
     # Results section
     # -----------------------------
     if len(st.session_state.responses) > 0:
-        st.subheader("A/B Test Results So Far")
+        st.subheader("A/B Test Results")
 
         results_df = pd.DataFrame(st.session_state.responses)
         st.dataframe(results_df)
 
-        st.write("Summary by chart:")
         summary_results = results_df.groupby("chart").agg(
             total_responses=("chart", "count"),
-            yes_rate=("answered_yes", lambda x: (x == "Yes").mean()),
+            accuracy=("is_correct", "mean"),
             avg_response_time=("response_time_sec", "mean"),
             avg_confidence=("confidence", "mean")
         ).reset_index()
 
+        st.write("Summary by chart:")
         st.dataframe(summary_results)
 
 # -----------------------------
@@ -200,19 +204,22 @@ else:
 
         st.write(f"Custom question: How does {selected_num} vary across {selected_cat}?")
 
+        summary_df = (
+            df.groupby(selected_cat, as_index=False)[selected_num]
+            .mean()
+            .sort_values(selected_num, ascending=False)
+        )
+
+        correct_category = summary_df.iloc[0][selected_cat]
+
         if st.button("Show me a random chart (custom mode)"):
             st.session_state.chart_type = random.choice(["A", "B"])
             st.session_state.start_time = time.time()
 
         if st.session_state.chart_type is not None:
-            fig, ax = plt.subplots(figsize=(10, chart_height))
+            fig, ax = plt.subplots(figsize=(10, 5))
 
             if st.session_state.chart_type == "A":
-                summary_df = (
-                    df.groupby(selected_cat, as_index=False)[selected_num]
-                    .mean()
-                    .sort_values(selected_num, ascending=False)
-                )
                 sns.barplot(
                     data=summary_df,
                     x=selected_cat,
@@ -223,50 +230,51 @@ else:
                     legend=False
                 )
                 ax.set_title(f"Chart A: Average {selected_num} by {selected_cat}")
+                plt.xticks(rotation=45)
+
             else:
-                sns.boxplot(
-                    data=df,
+                sns.pointplot(
+                    data=summary_df,
                     x=selected_cat,
                     y=selected_num,
-                    hue=selected_cat,
-                    palette=palette,
-                    ax=ax,
-                    legend=False
+                    color="black",
+                    ax=ax
                 )
-                ax.set_title(f"Chart B: Distribution of {selected_num} by {selected_cat}")
+                ax.set_title(f"Chart B: Average {selected_num} by {selected_cat}")
 
-            plt.xticks(rotation=45)
             st.pyplot(fig)
 
-            answer = st.radio(
-                "Did this chart answer the question?",
-                ["Select one", "Yes", "No"],
-                index=0,
+            user_answer = st.radio(
+                f"Which {selected_cat} has the highest {selected_num}?",
+                options=summary_df[selected_cat].tolist(),
                 key="custom_answer"
             )
 
             confidence = st.slider(
-                "How confident are you in your interpretation?",
+                "How confident are you in your answer?",
                 min_value=1,
                 max_value=5,
                 value=3,
                 key="custom_confidence"
             )
 
-            if st.button("Submit feedback (custom mode)"):
-                if answer != "Select one":
-                    elapsed_time = time.time() - st.session_state.start_time
+            if st.button("Submit answer (custom mode)"):
+                elapsed_time = time.time() - st.session_state.start_time
+                is_correct = user_answer == correct_category
 
-                    st.session_state.responses.append({
-                        "chart": st.session_state.chart_type,
-                        "answered_yes": answer,
-                        "response_time_sec": round(elapsed_time, 2),
-                        "confidence": confidence
-                    })
+                st.session_state.responses.append({
+                    "chart": st.session_state.chart_type,
+                    "selected_option": user_answer,
+                    "correct_option": correct_category,
+                    "is_correct": is_correct,
+                    "response_time_sec": round(elapsed_time, 2),
+                    "confidence": confidence
+                })
 
-                    st.success("Response recorded.")
+                if is_correct:
+                    st.success("Correct answer!")
                 else:
-                    st.warning("Please select Yes or No before submitting feedback.")
+                    st.error(f"Incorrect. The correct answer is: {correct_category}")
 
     else:
         st.warning("The uploaded dataset needs at least one categorical column and one numeric column.")
