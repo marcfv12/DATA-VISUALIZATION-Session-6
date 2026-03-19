@@ -10,18 +10,14 @@ st.title("A/B Testing App: Income Distribution by Region")
 st.header("Business Question")
 st.write("Which regions have a higher concentration of high-income households?")
 
-# -----------------------------
 # Load default dataset
-# -----------------------------
 @st.cache_data
 def load_default_data():
     return pd.read_json("income.json")
 
 df = load_default_data()
 
-# -----------------------------
 # Optional upload for top grade
-# -----------------------------
 uploaded_file = st.file_uploader(
     "Upload another dataset (CSV or JSON) if you want to test a different analysis",
     type=["csv", "json"]
@@ -36,18 +32,14 @@ if uploaded_file is not None:
 st.subheader("Preview of the dataset")
 st.dataframe(df.head())
 
-# -----------------------------
 # Default analysis for income.json
-# -----------------------------
 default_mode = False
 required_cols = {"region", "group", "pct"}
 
 if required_cols.issubset(df.columns):
     default_mode = True
 
-# -----------------------------
 # Session state
-# -----------------------------
 if "chart_type" not in st.session_state:
     st.session_state.chart_type = None
 
@@ -57,9 +49,7 @@ if "start_time" not in st.session_state:
 if "responses" not in st.session_state:
     st.session_state.responses = []
 
-# -----------------------------
-# Nice widgets
-# -----------------------------
+# Widgets
 palette = st.selectbox(
     "Choose a style for the charts",
     ["deep", "muted", "pastel", "dark", "colorblind"]
@@ -67,9 +57,7 @@ palette = st.selectbox(
 
 show_data = st.checkbox("Show filtered data preview", value=True)
 
-# -----------------------------
 # Default question logic
-# -----------------------------
 if default_mode:
     high_income_groups = ["100000 to 149999", "150000 to 199999", "200000+"]
 
@@ -124,7 +112,7 @@ if default_mode:
             ax.set_xlabel("Region")
             ax.set_ylabel("Total percentage")
 
-        # ✅ Chart B: pointplot (ONLY CHANGE)
+        # Chart B: pointplot 
         else:
             sns.pointplot(
                 data=summary_df,
@@ -170,9 +158,7 @@ if default_mode:
             else:
                 st.error(f"Incorrect. The correct answer is: {correct_region}")
 
-    # -----------------------------
     # Results section
-    # -----------------------------
     if len(st.session_state.responses) > 0:
         st.subheader("A/B Test Results")
 
@@ -189,9 +175,7 @@ if default_mode:
         st.write("Summary by chart:")
         st.dataframe(summary_results)
 
-# -----------------------------
 # Generic mode for uploaded datasets
-# -----------------------------
 else:
     st.subheader("Custom analysis mode")
 
